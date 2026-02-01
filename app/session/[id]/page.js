@@ -123,12 +123,11 @@ export default function SessionPage() {
         <div className="bg-white border border-[#d0d0d0] rounded shadow-sm p-4 sm:p-6 mb-6 max-w-7xl mx-auto">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-[#8bc34a] to-[#9ccc65] rounded flex items-center justify-center shadow-md">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </div>
+              <img 
+                src="/map-pin-icon.webp" 
+                alt="Meet Me in the Middle" 
+                className="w-20 h-20 object-contain"
+              />
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-[#37474f]">Meet Me in the Middle</h1>
                 <p className="text-base text-[#6b7c87] mt-1">
