@@ -10,7 +10,7 @@ export default function PrivacyPage() {
         
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-[#37474f] mb-2">Privacy Policy</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold text-[#37474f] mb-2">Privacy PolicyXXX</h1>
           <p className="text-sm text-[#6b7c87]">Last updated: {new Date().toLocaleDateString()}</p>
         </div>
         
