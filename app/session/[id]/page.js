@@ -116,7 +116,7 @@ export default function SessionPage() {
   const canStart = userCount === 2;
 
   return (
-    <div className="min-h-screen p-4">
+    <div className="min-h-screen p-4 pb-32">
       <div className="max-w-7xl mx-auto">
         
         {/* Header */}
