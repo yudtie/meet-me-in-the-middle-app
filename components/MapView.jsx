@@ -129,12 +129,15 @@ export default function MapView({ session, currentUserId, sessionId }) {
       {/* Update Location Button */}
       {currentUser && (
         <button
-  onClick={updateMyLocation}
-  disabled={updating}
-  className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10 bg-white shadow-lg px-3 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-gray-50 disabled:bg-gray-200 transition-colors text-sm sm:text-base"
->
-  {updating ? 'Updating...' : '📍 Update'}
-</button>
+          onClick={updateMyLocation}
+          disabled={updating}
+          className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10 bg-white border border-[#d0d0d0] hover:bg-gray-50 text-[#37474f] shadow-md px-3 py-2 sm:px-4 sm:py-2 rounded disabled:bg-gray-100 transition-all text-sm sm:text-base font-medium inline-flex items-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          {updating ? 'Updating...' : 'Update'}
+        </button>
       )}
 
       {/* Map */}
@@ -171,15 +174,15 @@ export default function MapView({ session, currentUserId, sessionId }) {
                 </div>
                 
                 <div className="absolute top-12 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
-  <div className="bg-white px-2 py-1 rounded shadow text-xs font-semibold mb-1">
-    {user.name}
-  </div>
-  {user.lastUpdated && (
-    <div className="bg-gray-800 text-white px-2 py-1 rounded shadow text-xs text-center">
-      {timeAgo(user.lastUpdated)}
-    </div>
-  )}
-</div>
+                  <div className="bg-white px-2 py-1 rounded shadow text-xs font-semibold mb-1">
+                    {user.name}
+                  </div>
+                  {user.lastUpdated && (
+                    <div className="bg-gray-800 text-white px-2 py-1 rounded shadow text-xs text-center">
+                      {timeAgo(user.lastUpdated)}
+                    </div>
+                  )}
+                </div>
               </div>
             </Marker>
           );
@@ -254,22 +257,22 @@ export default function MapView({ session, currentUserId, sessionId }) {
       </Map>
 
       {/* Legend */}
-      <div className="absolute bottom-2 left-2 sm:bottom-4 sm:left-4 bg-white p-2 sm:p-3 rounded-lg shadow-lg text-xs">
+      <div className="absolute bottom-2 left-2 sm:bottom-4 sm:left-4 bg-white border border-[#d0d0d0] p-2 sm:p-3 rounded shadow-md text-xs">
         <div className="flex items-center gap-2 mb-1">
-          <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
-          <span>You</span>
+          <div className="w-4 h-4 bg-blue-500 rounded-full border-2 border-blue-700"></div>
+          <span className="text-[#37474f] font-medium">You</span>
         </div>
         <div className="flex items-center gap-2 mb-1">
-          <div className="w-4 h-4 bg-green-500 rounded-full"></div>
-          <span>Other User</span>
+          <div className="w-4 h-4 bg-green-500 rounded-full border-2 border-green-700"></div>
+          <span className="text-[#37474f] font-medium">Other User</span>
         </div>
         <div className="flex items-center gap-2 mb-1">
-          <div className="w-4 h-4 bg-purple-500 rounded-full"></div>
-          <span>Midpoint</span>
+          <div className="w-4 h-4 bg-purple-500 rounded-full border-2 border-purple-700"></div>
+          <span className="text-[#37474f] font-medium">Midpoint</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-red-500 rounded-full"></div>
-          <span>Venues</span>
+          <div className="w-4 h-4 bg-red-500 rounded-full border-2 border-red-700"></div>
+          <span className="text-[#37474f] font-medium">Venues</span>
         </div>
       </div>
 

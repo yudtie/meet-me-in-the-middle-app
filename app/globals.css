@@ -1,38 +1,46 @@
 @import "tailwindcss";
 
 :root {
-  --futurico-cyan: #00bcd4;
-  --futurico-blue: #2196F3;
-  --futurico-dark: #1e2028;
-  --futurico-darker: #16181d;
-  --futurico-light: #2a2d3a;
+  --futurico-green: #8bc34a;
+  --futurico-green-light: #9ccc65;
+  --futurico-blue: #5dade2;
+  --futurico-bg: #ebe9e1;
+  --futurico-card: #ffffff;
+  --futurico-border: #d0d0d0;
+  --futurico-text: #37474f;
+  --futurico-text-light: #6b7c87;
 }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  background: var(--futurico-dark);
-  color: #ffffff;
+  background-color: #ebe9e1;
+  color: var(--futurico-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Paper grain texture */
+  background-image:
+    repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, .02) 2px, rgba(0, 0, 0, .02) 4px),
+    repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(0, 0, 0, .02) 2px, rgba(0, 0, 0, .02) 4px);
+  background-size: 100% 100%, 100% 100%;
 }
 
-/* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--futurico-darker);
+  background: #e0e0e0;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--futurico-light);
-  border-radius: 5px;
+  background: #b0b0b0;
+  border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3a3d4a;
+  background: #9e9e9e;
 }
 
 .scrollbar-hide::-webkit-scrollbar {
@@ -44,7 +52,6 @@ body {
   scrollbar-width: none;
 }
 
-/* Smooth transitions */
 * {
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
