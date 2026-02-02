@@ -2,179 +2,117 @@ import { NextResponse } from 'next/server';
 import { ref, update } from 'firebase/database';
 import { database } from '@/lib/firebase';
 
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-
 export async function POST(request) {
   try {
-    const { sessionId, location1, location2 } = await request.json();
-
-    // Step 1: Get the route between the two users
-    const routeResponse = await fetch(
-      `https://api.mapbox.com/directions/v5/mapbox/driving/${location1.lng},${location1.lat};${location2.lng},${location2.lat}?geometries=geojson&access_token=${MAPBOX_TOKEN}`
-    );
-    const routeData = await routeResponse.json();
-
-    if (!routeData.routes || routeData.routes.length === 0) {
-      return NextResponse.json({ error: 'Could not find route' }, { status: 400 });
+    const { sessionId, users } = await request.json();
+    
+    if (!users || users.length < 2) {
+      return NextResponse.json(
+        { error: 'At least 2 users required' },
+        { status: 400 }
+      );
     }
 
-    const route = routeData.routes[0];
-    const coordinates = route.geometry.coordinates;
-    const midpointCoord = coordinates[Math.floor(coordinates.length / 2)];
-    
-    const midpoint = {
-      lng: midpointCoord[0],
-      lat: midpointCoord[1]
-    };
+    const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
-    // Step 2: Search for venues near the midpoint
-    const venues = await searchVenues(midpoint, location1, location2);
+    // Calculate geographic center of all users
+    const avgLat = users.reduce((sum, u) => sum + u.location.lat, 0) / users.length;
+    const avgLng = users.reduce((sum, u) => sum + u.location.lng, 0) / users.length;
 
-    // Step 3: Update Firebase with midpoint and venues
-    const updates = {};
-    updates[`sessions/${sessionId}/midpoint`] = midpoint;
-    updates[`sessions/${sessionId}/venues`] = venues;
-    updates[`sessions/${sessionId}/lastCalculated`] = Date.now();
+    // Use the geographic center as the midpoint
+    const midpoint = { lat: avgLat, lng: avgLng };
 
-    await update(ref(database), updates);
+    // Search for venues near the midpoint
+    const searchResponse = await fetch(
+      `https://api.mapbox.com/search/searchbox/v1/category/cafe,restaurant,bar,gas_station?proximity=${midpoint.lng},${midpoint.lat}&limit=20&access_token=${MAPBOX_TOKEN}`
+    );
 
-    return NextResponse.json({ 
-      success: true, 
-      midpoint, 
-      venues 
+    if (!searchResponse.ok) {
+      throw new Error('Failed to search venues');
+    }
+
+    const searchData = await searchResponse.json();
+    const venues = searchData.features || [];
+
+    // Calculate drive times for ALL users to each venue
+    const venuesWithDriveTimes = await Promise.all(
+      venues.map(async (venue) => {
+        const venueLat = venue.geometry.coordinates[1];
+        const venueLng = venue.geometry.coordinates[0];
+
+        // Get drive times for all users
+        const driveTimes = await Promise.all(
+          users.map(async (user, index) => {
+            const dirResponse = await fetch(
+              `https://api.mapbox.com/directions/v5/mapbox/driving/${user.location.lng},${user.location.lat};${venueLng},${venueLat}?access_token=${MAPBOX_TOKEN}`
+            );
+            const dirData = await dirResponse.json();
+            const route = dirData.routes?.[0];
+
+            return {
+              userIndex: index,
+              driveTime: route ? Math.round(route.duration / 60) : null,
+              distance: route ? (route.distance / 1609.34).toFixed(1) : null
+            };
+          })
+        );
+
+        // Calculate fairness metrics
+        const times = driveTimes.map(dt => dt.driveTime).filter(t => t !== null);
+        const maxTime = Math.max(...times);
+        const minTime = Math.min(...times);
+        const avgTime = times.reduce((a, b) => a + b, 0) / times.length;
+        const timeDifference = maxTime - minTime;
+
+        return {
+          id: venue.properties.mapbox_id,
+          name: venue.properties.name,
+          address: venue.properties.full_address || venue.properties.place_formatted,
+          category: venue.properties.poi_category?.[0] || 'venue',
+          location: { lat: venueLat, lng: venueLng },
+          driveTimes: driveTimes,
+          maxTime,
+          minTime,
+          avgTime: Math.round(avgTime),
+          timeDifference,
+          distanceFromMidpoint: (
+            Math.sqrt(
+              Math.pow(venueLat - midpoint.lat, 2) +
+              Math.pow(venueLng - midpoint.lng, 2)
+            ) * 69
+          ).toFixed(1)
+        };
+      })
+    );
+
+    // Sort by fairness (smallest time difference, then smallest max time)
+    const sortedVenues = venuesWithDriveTimes.sort((a, b) => {
+      if (a.timeDifference !== b.timeDifference) {
+        return a.timeDifference - b.timeDifference;
+      }
+      return a.maxTime - b.maxTime;
+    });
+
+    const finalVenues = sortedVenues.slice(0, 15);
+
+    // Save results to Firebase
+    if (sessionId) {
+      const updates = {};
+      updates[`sessions/${sessionId}/midpoint`] = midpoint;
+      updates[`sessions/${sessionId}/venues`] = finalVenues;
+      await update(ref(database), updates);
+    }
+
+    return NextResponse.json({
+      midpoint,
+      venues: finalVenues
     });
 
   } catch (error) {
     console.error('Error calculating midpoint:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
-
-// Helper function to search for venues
-async function searchVenues(midpoint, location1, location2) {
-  const categories = [
-    'cafe',
-    'restaurant', 
-    'bar',
-    'gas_station'
-  ];
-
-  const allVenues = [];
-
-  // Use Mapbox Search API
-  for (const category of categories) {
-    try {
-      const searchResponse = await fetch(
-        `https://api.mapbox.com/search/searchbox/v1/category/${category}?` +
-        `proximity=${midpoint.lng},${midpoint.lat}&` +
-        `limit=5&` +
-        `access_token=${MAPBOX_TOKEN}`
-      );
-
-      const searchData = await searchResponse.json();
-
-      if (searchData.features) {
-        for (const feature of searchData.features) {
-          allVenues.push({
-            id: feature.properties.mapbox_id,
-            name: feature.properties.name,
-            category: category,
-            address: feature.properties.full_address || feature.properties.place_formatted || 'Address not available',
-            location: {
-              lng: feature.geometry.coordinates[0],
-              lat: feature.geometry.coordinates[1]
-            }
-          });
-        }
-      }
-    } catch (error) {
-      console.error(`Error searching ${category}:`, error);
-    }
-  }
-
-  // Step 3: Calculate drive time from each user to each venue
-  const venuesWithDriveTimes = await Promise.all(
-  allVenues.map(async (venue) => {
-    // Get drive time and distance from User 1 to venue
-    const result1 = await getDriveTimeAndDistance(location1, venue.location);
-    
-    // Get drive time and distance from User 2 to venue
-    const result2 = await getDriveTimeAndDistance(location2, venue.location);
-
-    // Calculate distance from midpoint
-    const distanceFromMidpoint = calculateDistance(
-      midpoint.lat, 
-      midpoint.lng, 
-      venue.location.lat, 
-      venue.location.lng
+    return NextResponse.json(
+      { error: 'Failed to calculate midpoint' },
+      { status: 500 }
     );
-
-    return {
-      ...venue,
-      driveTimeUser1: result1.time,
-      driveTimeUser2: result2.time,
-      distanceUser1: result1.distance,
-      distanceUser2: result2.distance,
-      totalDriveTime: result1.time + result2.time,
-      timeDifference: Math.abs(result1.time - result2.time),
-      distanceFromMidpoint: distanceFromMidpoint
-    };
-  })
-);
-
-  // Sort venues by fairness and total drive time
-  const sortedVenues = venuesWithDriveTimes.sort((a, b) => {
-    // Prioritize venues where drive times are most equal
-    if (Math.abs(a.timeDifference - b.timeDifference) > 2) {
-      return a.timeDifference - b.timeDifference;
-    }
-    // Then by total drive time
-    return a.totalDriveTime - b.totalDriveTime;
-  });
-
-  // Return top 10
-  return sortedVenues.slice(0, 10);
-}
-
-// Helper: Get drive time and distance between two points
-async function getDriveTimeAndDistance(origin, destination) {
-  try {
-    const response = await fetch(
-      `https://api.mapbox.com/directions/v5/mapbox/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?access_token=${MAPBOX_TOKEN}`
-    );
-    const data = await response.json();
-    
-    if (data.routes && data.routes.length > 0) {
-      const route = data.routes[0];
-      return {
-        time: Math.round(route.duration / 60), // Convert to minutes
-        distance: Math.round((route.distance * 0.000621371) * 10) / 10 // Convert meters to miles, round to 1 decimal
-      };
-    }
-    return { time: 0, distance: 0 };
-  } catch (error) {
-    console.error('Error getting drive time:', error);
-    return { time: 0, distance: 0 };
   }
-}
-
-// Helper: Calculate straight-line distance (Haversine formula)
-function calculateDistance(lat1, lon1, lat2, lon2) {
-  const R = 3959; // Earth's radius in miles
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  
-  const a = 
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = R * c;
-  
-  return Math.round(distance * 10) / 10; // Round to 1 decimal
-}
-
-function toRad(degrees) {
-  return degrees * (Math.PI / 180);
 }

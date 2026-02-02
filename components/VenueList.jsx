@@ -12,13 +12,29 @@ export default function VenueList({ session, sessionId }) {
   const venues = session?.venues || [];
   const users = session?.users ? Object.values(session.users) : [];
 
-  // Filter venues by category
-  const filteredVenues = selectedCategory === 'all' 
-    ? venues 
-    : venues.filter(v => v.category === selectedCategory);
+  // Category groupings
+  const categoryMap = {
+    'dining': ['restaurant', 'cafe', 'coffee', 'food', 'fast_food', 'pizza', 'bakery'],
+    'bars': ['bar', 'pub', 'nightclub', 'brewery', 'wine_bar'],
+    'gas': ['gas_station', 'fuel', 'ev_charging']
+  };
 
-  // Get unique categories from venues
-  const categories = ['all', ...new Set(venues.map(v => v.category))];
+  // Get simplified category for a venue
+  const getSimplifiedCategory = (rawCategory) => {
+    const lower = rawCategory?.toLowerCase() || '';
+    for (const [group, keywords] of Object.entries(categoryMap)) {
+      if (keywords.some(k => lower.includes(k))) return group;
+    }
+    return 'other';
+  };
+
+  // Fixed categories (always show these)
+  const categories = ['all', 'dining', 'bars', 'gas'];
+
+  // Filter venues by simplified category
+  const filteredVenues = selectedCategory === 'all'
+    ? venues
+    : venues.filter(v => getSimplifiedCategory(v.category) === selectedCategory);
 
   // Select a venue as the final meeting spot
   const selectVenue = async (venue) => {
@@ -34,10 +50,47 @@ export default function VenueList({ session, sessionId }) {
     await update(ref(database), updates);
   };
 
-  // Trigger initial calculation when both users are present
+  const calculateVenues = async () => {
+    if (users.length < 2) return;
+
+    setLoading(true);
+
+    // Filter users with valid locations
+    const usersWithLocations = users.filter(u => u.location?.lat && u.location?.lng);
+
+    if (usersWithLocations.length < 2) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      await fetch('/api/calculate-midpoint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          users: usersWithLocations
+        })
+      });
+    } catch (error) {
+      console.error('Error calculating venues:', error);
+      alert('Failed to find venues. Please try again.');
+    }
+
+    setLoading(false);
+  };
+
+  // Trigger calculation when enough users are present or when user count changes
   useEffect(() => {
-    if (users.length === 2 && venues.length === 0 && !loading) {
-      calculateVenues();
+    if (users.length >= 2 && !loading) {
+      // Calculate if no venues yet
+      if (venues.length === 0) {
+        calculateVenues();
+      }
+      // Recalculate if user count changed (e.g., 3rd user joined)
+      else if (venues[0]?.driveTimes?.length !== users.length) {
+        calculateVenues();
+      }
     }
   }, [users.length]);
 
@@ -71,33 +124,8 @@ export default function VenueList({ session, sessionId }) {
     }
   }, [session?.selectedVenue?.id]);
 
-  const calculateVenues = async () => {
-    if (users.length !== 2) return;
-    
-    setLoading(true);
-    
-    const [user1, user2] = users;
-    
-    try {
-      await fetch('/api/calculate-midpoint', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId,
-          location1: user1.location,
-          location2: user2.location
-        })
-      });
-    } catch (error) {
-      console.error('Error calculating venues:', error);
-      alert('Failed to find venues. Please try again.');
-    }
-    
-    setLoading(false);
-  };
-
   // Loading state
-  if (loading || (users.length === 2 && venues.length === 0)) {
+  if (loading || (users.length >= 2 && venues.length === 0)) {
     return (
       <div className="text-center py-12">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
@@ -135,19 +163,31 @@ export default function VenueList({ session, sessionId }) {
       </div>
 
       {/* Category Filter */}
-      <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide -mx-2 px-2 sm:mx-0 sm:px-0">
+      <div className="grid grid-cols-2 gap-2 mb-4">
         {categories.map(cat => (
-          <button
+          <label
             key={cat}
             onClick={() => updateCategory(cat)}
-            className={`px-4 py-2 rounded whitespace-nowrap transition-all font-medium text-sm ${
+            className={`flex items-center gap-2 px-3 py-2 rounded cursor-pointer transition-all text-sm ${
               selectedCategory === cat
-                ? 'bg-gradient-to-r from-[#8bc34a] to-[#9ccc65] text-white shadow-md'
-                : 'bg-white text-[#37474f] border border-[#d0d0d0] hover:bg-gray-50'
+                ? 'bg-green-50 border border-[#8bc34a]'
+                : 'bg-white border border-[#d0d0d0] hover:bg-gray-50'
             }`}
           >
-            {cat === 'all' ? 'All' : cat.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-          </button>
+            <input
+              type="radio"
+              name="category"
+              checked={selectedCategory === cat}
+              onChange={() => updateCategory(cat)}
+              className="w-4 h-4 text-[#8bc34a] accent-[#8bc34a]"
+            />
+            <span className="truncate">
+              {cat === 'all' ? 'All' :
+               cat === 'dining' ? 'Food & Cafes' :
+               cat === 'bars' ? 'Bars' :
+               cat === 'gas' ? 'Gas Stations' : cat}
+            </span>
+          </label>
         ))}
       </div>
 
@@ -194,36 +234,43 @@ export default function VenueList({ session, sessionId }) {
                 <p className="text-xs sm:text-sm text-[#6b7c87] line-clamp-2">{venue.address}</p>
               </div>
 
-              {/* Drive Times */}
-              <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-3">
-                <div className="bg-blue-50 border border-blue-200 rounded p-2 sm:p-3">
-                  <div className="text-xs text-[#6b7c87] truncate">{users[0]?.name || 'User 1'}</div>
-                  <div className="font-bold text-blue-600 text-sm sm:text-base">
-                    {venue.driveTimeUser1} min
-                  </div>
-                  <div className="text-xs text-blue-500 mt-1">
-                    {venue.distanceUser1 ? `${venue.distanceUser1} mi` : ''}
-                  </div>
-                </div>
-                
-                <div className="bg-green-50 border border-green-200 rounded p-2 sm:p-3">
-                  <div className="text-xs text-[#6b7c87] truncate">{users[1]?.name || 'User 2'}</div>
-                  <div className="font-bold text-green-600 text-sm sm:text-base">
-                    {venue.driveTimeUser2} min
-                  </div>
-                  <div className="text-xs text-green-500 mt-1">
-                    {venue.distanceUser2 ? `${venue.distanceUser2} mi` : ''}
-                  </div>
-                </div>
+              {/* Drive Times for All Users */}
+              <div className={`grid gap-2 sm:gap-3 mt-3 ${
+                venue.driveTimes.length === 2 ? 'grid-cols-2' : 
+                venue.driveTimes.length === 3 ? 'grid-cols-3' : 
+                'grid-cols-2'
+              }`}>
+                {venue.driveTimes.map((dt, idx) => {
+                  const user = users[dt.userIndex];
+                  const colors = [
+                    { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-600', light: 'text-blue-500' },
+                    { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-600', light: 'text-green-500' },
+                    { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-600', light: 'text-purple-500' },
+                    { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-600', light: 'text-orange-500' },
+                  ];
+                  const color = colors[idx] || colors[0];
+                  
+                  return (
+                    <div key={dt.userIndex} className={`${color.bg} border ${color.border} rounded p-2 sm:p-3`}>
+                      <div className="text-xs text-[#6b7c87] truncate">{user?.name || `User ${dt.userIndex + 1}`}</div>
+                      <div className={`font-bold ${color.text} text-sm sm:text-base`}>
+                        {dt.driveTime} min
+                      </div>
+                      <div className={`text-xs ${color.light} mt-1`}>
+                        {dt.distance ? `${dt.distance} mi` : ''}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
-              {/* Fairness Indicator */}
+              {/* Fairness Info */}
               <div className="mt-3 flex items-center justify-between text-xs text-[#6b7c87]">
                 <span>
-                  Time difference: <strong className="text-[#37474f]">{venue.timeDifference} min</strong>
+                  Max difference: <strong className="text-[#37474f]">{venue.timeDifference} min</strong>
                 </span>
                 <span>
-                  {venue.distanceFromMidpoint} mi from midpoint
+                  Avg: <strong className="text-[#37474f]">{venue.avgTime} min</strong>
                 </span>
               </div>
 

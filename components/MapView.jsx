@@ -14,7 +14,7 @@ export default function MapView({ session, currentUserId, sessionId }) {
     zoom: 10
   });
   const [updating, setUpdating] = useState(false);
-  const [routes, setRoutes] = useState({ route1: null, route2: null });
+  const [routes, setRoutes] = useState([]);
 
   // Calculate bounds to fit all markers
   useEffect(() => {
@@ -101,19 +101,21 @@ export default function MapView({ session, currentUserId, sessionId }) {
 
   // Recalculate midpoint and venues
   const recalculateMidpointAndVenues = async () => {
-    const users = Object.values(session.users);
-    if (users.length !== 2) return;
+    const userList = Object.values(session.users);
+    if (userList.length < 2) return;
 
-    const [user1, user2] = users;
-    
+    // Filter users with valid locations
+    const usersWithLocations = userList.filter(u => u.location?.lat && u.location?.lng);
+
+    if (usersWithLocations.length < 2) return;
+
     try {
       await fetch('/api/calculate-midpoint', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId,
-          location1: user1.location,
-          location2: user2.location
+          users: usersWithLocations
         })
       });
     } catch (error) {
@@ -126,34 +128,35 @@ export default function MapView({ session, currentUserId, sessionId }) {
 
   // Fetch driving routes when venue is selected
   useEffect(() => {
-    const fetchRoutes = async () => {
-      if (!session?.selectedVenue || !session?.users) return;
-      
-      const users = Object.values(session.users);
-      if (users.length !== 2) return;
+    if (!session?.selectedVenue || !session?.users) return;
 
-      const venue = session.selectedVenue;
-      
+    const userList = Object.values(session.users);
+    if (userList.length < 2) return;
+
+    const venue = session.selectedVenue;
+    if (!venue?.location?.lat) return;
+
+    const fetchRoutes = async () => {
       try {
-        // Fetch route for User 1
-        const response1 = await fetch(
-          `https://api.mapbox.com/directions/v5/mapbox/driving/${users[0].location.lng},${users[0].location.lat};${venue.location.lng},${venue.location.lat}?geometries=geojson&access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}`
-        );
-        const data1 = await response1.json();
-        
-        // Fetch route for User 2
-        const response2 = await fetch(
-          `https://api.mapbox.com/directions/v5/mapbox/driving/${users[1].location.lng},${users[1].location.lat};${venue.location.lng},${venue.location.lat}?geometries=geojson&access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}`
-        );
-        const data2 = await response2.json();
-        
-        setRoutes({
-          route1: data1.routes?.[0]?.geometry || null,
-          route2: data2.routes?.[0]?.geometry || null
-        });
+        // Fetch routes for all users with valid locations
+        const routePromises = userList
+          .filter(user => user?.location?.lat && user?.location?.lng)
+          .map(async (user, index) => {
+            const response = await fetch(
+              `https://api.mapbox.com/directions/v5/mapbox/driving/${user.location.lng},${user.location.lat};${venue.location.lng},${venue.location.lat}?geometries=geojson&access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}`
+            );
+            const data = await response.json();
+            return {
+              index,
+              geometry: data.routes?.[0]?.geometry || null
+            };
+          });
+
+        const fetchedRoutes = await Promise.all(routePromises);
+        setRoutes(fetchedRoutes.filter(r => r.geometry));
       } catch (error) {
         console.error('Error fetching routes:', error);
-        setRoutes({ route1: null, route2: null });
+        setRoutes([]);
       }
     };
 
@@ -190,10 +193,18 @@ export default function MapView({ session, currentUserId, sessionId }) {
         
         {/* User Markers */}
         {users.map(([userId, user], index) => {
-          if (!user.location) return null;
-          
+          // Skip if user doesn't have location
+          if (!user?.location?.lat || !user?.location?.lng) return null;
+
           const isCurrentUser = userId === currentUserId;
-          
+          const colors = [
+            { bg: 'bg-blue-500', border: 'border-blue-700' },
+            { bg: 'bg-green-500', border: 'border-green-700' },
+            { bg: 'bg-purple-500', border: 'border-purple-700' },
+            { bg: 'bg-orange-500', border: 'border-orange-700' },
+          ];
+          const color = colors[index] || colors[0];
+
           return (
             <Marker
               key={userId}
@@ -201,25 +212,12 @@ export default function MapView({ session, currentUserId, sessionId }) {
               longitude={user.location.lng}
             >
               <div className="relative">
-                <div 
-                  className={`w-10 h-10 rounded-full border-4 flex items-center justify-center text-white font-bold shadow-lg ${
-                    isCurrentUser 
-                      ? 'bg-blue-500 border-blue-700' 
-                      : 'bg-green-500 border-green-700'
-                  }`}
-                >
-                  {isCurrentUser ? 'You' : index + 1}
+                <div className={`w-10 h-10 ${color.bg} rounded-full ${color.border} border-4 flex items-center justify-center text-white font-bold shadow-lg`}>
+                  {index + 1}
                 </div>
-                
-                <div className="absolute top-12 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
-                  <div className="bg-white px-2 py-1 rounded shadow text-xs font-semibold mb-1">
-                    {user.name}
-                  </div>
-                  {user.lastUpdated && (
-                    <div className="bg-gray-800 text-white px-2 py-1 rounded shadow text-xs text-center">
-                      {timeAgo(user.lastUpdated)}
-                    </div>
-                  )}
+                <div className="absolute top-12 left-1/2 transform -translate-x-1/2 bg-white px-2 py-1 rounded shadow-md text-xs whitespace-nowrap border border-[#d0d0d0]">
+                  <div className="font-semibold text-[#37474f]">{user.name}</div>
+                  <div className="text-[#6b7c87] text-xs">{timeAgo(user.lastUpdated)}</div>
                 </div>
               </div>
             </Marker>
@@ -227,49 +225,35 @@ export default function MapView({ session, currentUserId, sessionId }) {
         })}
 
         {/* Midpoint Marker */}
-        {session?.midpoint && (
+        {session?.midpoint?.lat && session?.midpoint?.lng && (
           <Marker
             latitude={session.midpoint.lat}
             longitude={session.midpoint.lng}
           >
-            <div className="relative">
-              <div className="w-8 h-8 bg-purple-500 border-4 border-purple-700 rounded-full flex items-center justify-center shadow-lg">
-                <span className="text-white text-xl">⭐</span>
-              </div>
-              <div className="absolute top-10 left-1/2 transform -translate-x-1/2 bg-white px-2 py-1 rounded shadow text-xs whitespace-nowrap">
-                Midpoint
-              </div>
+            <div className="w-10 h-10 bg-pink-500 rounded-full border-4 border-pink-700 flex items-center justify-center text-white font-bold shadow-lg">
+              ⭐
             </div>
           </Marker>
         )}
 
-        {/* Route Lines - User 1 to Selected Venue */}
-        {routes.route1 && (
-          <Source type="geojson" data={routes.route1}>
-            <Layer
-              type="line"
-              paint={{
-                'line-color': '#3b82f6',
-                'line-width': 4,
-                'line-opacity': 0.7
-              }}
-            />
-          </Source>
-        )}
+        {/* Route Lines - All Users to Selected Venue */}
+        {routes.map((route) => {
+          const routeColors = ['#3b82f6', '#22c55e', '#a855f7', '#f97316'];
+          const color = routeColors[route.index] || routeColors[0];
 
-        {/* Route Lines - User 2 to Selected Venue */}
-        {routes.route2 && (
-          <Source type="geojson" data={routes.route2}>
-            <Layer
-              type="line"
-              paint={{
-                'line-color': '#22c55e',
-                'line-width': 4,
-                'line-opacity': 0.7
-              }}
-            />
-          </Source>
-        )}
+          return (
+            <Source key={`route-${route.index}`} type="geojson" data={route.geometry}>
+              <Layer
+                type="line"
+                paint={{
+                  'line-color': color,
+                  'line-width': 4,
+                  'line-opacity': 0.7
+                }}
+              />
+            </Source>
+          );
+        })}
 
         {/* Venue Markers */}
         {session?.venues?.map((venue, index) => {
@@ -281,10 +265,10 @@ export default function MapView({ session, currentUserId, sessionId }) {
               latitude={venue.location.lat}
               longitude={venue.location.lng}
             >
-              <div 
+              <div
                 className={`rounded-full flex items-center justify-center text-white font-bold shadow-lg cursor-pointer hover:scale-110 transition-transform ${
-                  isSelected 
-                    ? 'w-12 h-12 bg-yellow-500 border-4 border-yellow-700 animate-pulse' 
+                  isSelected
+                    ? 'w-12 h-12 bg-yellow-500 border-4 border-yellow-700 animate-pulse'
                     : 'w-8 h-8 bg-red-500 border-2 border-red-700'
                 }`}
                 title={venue.name}
@@ -331,36 +315,31 @@ export default function MapView({ session, currentUserId, sessionId }) {
       </Map>
 
       {/* Legend */}
-      <div className="absolute bottom-2 left-2 sm:bottom-4 sm:left-4 bg-white border border-[#d0d0d0] p-2 sm:p-3 rounded shadow-md text-xs">
+      <div className="absolute bottom-2 left-2 sm:bottom-4 sm:left-4 bg-white border border-[#d0d0d0] p-2 sm:p-3 rounded shadow-md text-xs max-w-[200px]">
+        {users.map(([userId, user], index) => {
+          const colors = [
+            'bg-blue-500 border-blue-700',
+            'bg-green-500 border-green-700',
+            'bg-purple-500 border-purple-700',
+            'bg-orange-500 border-orange-700',
+          ];
+          const color = colors[index] || colors[0];
+
+          return (
+            <div key={userId} className="flex items-center gap-2 mb-1">
+              <div className={`w-4 h-4 ${color} rounded-full border-2`}></div>
+              <span className="text-[#37474f] font-medium truncate">{user.name}</span>
+            </div>
+          );
+        })}
         <div className="flex items-center gap-2 mb-1">
-          <div className="w-4 h-4 bg-blue-500 rounded-full border-2 border-blue-700"></div>
-          <span className="text-[#37474f] font-medium">You</span>
-        </div>
-        <div className="flex items-center gap-2 mb-1">
-          <div className="w-4 h-4 bg-green-500 rounded-full border-2 border-green-700"></div>
-          <span className="text-[#37474f] font-medium">Other User</span>
-        </div>
-        <div className="flex items-center gap-2 mb-1">
-          <div className="w-4 h-4 bg-purple-500 rounded-full border-2 border-purple-700"></div>
+          <div className="w-4 h-4 bg-pink-500 rounded-full border-2 border-pink-700"></div>
           <span className="text-[#37474f] font-medium">Midpoint</span>
         </div>
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-red-500 rounded-full border-2 border-red-700"></div>
           <span className="text-[#37474f] font-medium">Venues</span>
         </div>
-        {session?.selectedVenue && (
-          <>
-            <div className="border-t border-[#d0d0d0] my-2"></div>
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-6 h-1 bg-blue-500 opacity-70"></div>
-              <span className="text-[#37474f] font-medium">Your route</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-1 bg-green-500 opacity-70"></div>
-              <span className="text-[#37474f] font-medium">Their route</span>
-            </div>
-          </>
-        )}
       </div>
 
     </div>

@@ -20,11 +20,12 @@ export default function SessionPage() {
   const [showShareMenu, setShowShareMenu] = useState(false);
 
   useEffect(() => {
-    // Generate unique user ID (stored in localStorage)
-    let uid = localStorage.getItem('userId');
+    // Generate unique user ID per session (stored in localStorage)
+    const storageKey = `userId_${sessionId}`;
+    let uid = localStorage.getItem(storageKey);
     if (!uid) {
       uid = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      localStorage.setItem('userId', uid);
+      localStorage.setItem(storageKey, uid);
     }
     setUserId(uid);
 
@@ -123,7 +124,7 @@ export default function SessionPage() {
   }
 
   const userCount = Object.keys(session.users || {}).length;
-  const canStart = userCount === 2;
+  const canStart = userCount >= 2;
 
   return (
     <div className="min-h-screen p-4 pb-32">
@@ -143,7 +144,7 @@ export default function SessionPage() {
                 <p className="text-base text-[#6b7c87] mt-1">
                   <span className="inline-flex items-center gap-2">
                     <span className={`w-2 h-2 rounded-full ${userCount === 2 ? 'bg-[#8bc34a]' : 'bg-[#ffc107]'}`}></span>
-                    {userCount}/2 users connected
+                    {userCount} user{userCount !== 1 ? 's' : ''} connected
                   </span>
                 </p>
               </div>
