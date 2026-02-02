@@ -1,11 +1,13 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ref, update } from 'firebase/database';
 import { database } from '@/lib/firebase';
+
 
 export default function VenueList({ session, sessionId }) {
   const [selectedCategory, setSelectedCategory] = useState(session?.selectedCategory || 'all');
   const [loading, setLoading] = useState(false);
+  const venueListRef = useRef(null);
 
   const venues = session?.venues || [];
   const users = session?.users ? Object.values(session.users) : [];
@@ -45,6 +47,29 @@ export default function VenueList({ session, sessionId }) {
       setSelectedCategory(session.selectedCategory);
     }
   }, [session?.selectedCategory]);
+
+  // Auto-scroll to top when venue is selected
+  useEffect(() => {
+    if (session?.selectedVenue) {
+      // Double requestAnimationFrame to ensure React has finished re-rendering
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          // Scroll the window to top
+          window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+          });
+          // Also scroll the container if it's scrollable
+          if (venueListRef.current) {
+            venueListRef.current.scrollTo({
+              top: 0,
+              behavior: 'smooth'
+            });
+          }
+        });
+      });
+    }
+  }, [session?.selectedVenue?.id]);
 
   const calculateVenues = async () => {
     if (users.length !== 2) return;
@@ -127,7 +152,7 @@ export default function VenueList({ session, sessionId }) {
       </div>
 
       {/* Venue List */}
-      <div className="flex-1 overflow-y-auto space-y-3">
+      <div ref={venueListRef} className="flex-1 overflow-y-auto space-y-3">
         {(() => {
         // Separate selected venue from others
         const selectedVenue = session?.selectedVenue;
@@ -140,16 +165,18 @@ export default function VenueList({ session, sessionId }) {
           orderedVenues.unshift(selected);
         }
   
-          return orderedVenues.map((venue, index) => {
+          return orderedVenues.map((venue) => {
             const isSelected = session?.selectedVenue?.id === venue.id;
-          
+            // Use original index from venues array to match map markers
+            const originalIndex = venues.findIndex(v => v.id === venue.id);
+
           return (
             <div
               key={venue.id}
               onClick={() => selectVenue(venue)}
               className={`border rounded p-4 cursor-pointer transition-all ${
-                isSelected 
-                  ? 'border-[#8bc34a] bg-green-50 shadow-md' 
+                isSelected
+                  ? 'border-[#8bc34a] bg-green-50 shadow-md'
                   : 'border-[#d0d0d0] bg-white hover:border-[#8bc34a] hover:shadow-sm'
               }`}
             >
@@ -157,7 +184,7 @@ export default function VenueList({ session, sessionId }) {
               <div className="mb-2">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="bg-red-500 text-white w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold flex-shrink-0">
-                    {index + 1}
+                    {originalIndex + 1}
                   </span>
                   <h3 className="font-bold text-base sm:text-lg flex-1 min-w-0 truncate text-[#37474f]">{venue.name}</h3>
                   <span className="bg-gray-100 text-[#6b7c87] px-2 py-1 rounded text-xs flex-shrink-0 border border-[#d0d0d0]">
@@ -206,6 +233,19 @@ export default function VenueList({ session, sessionId }) {
                   ✓ Selected Meeting Spot
                 </div>
               )}
+
+              {/* Get Directions Button */}
+
+              <a href={`https://www.google.com/maps/dir/?api=1&destination=${venue.location.lat},${venue.location.lng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 w-full bg-[#5dade2] hover:bg-[#4a9dd1] text-white py-2.5 rounded font-medium shadow-sm hover:shadow-md transition-all inline-flex items-center justify-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                </svg>
+                Get Directions
+              </a>
             </div>
           );
         });})()}

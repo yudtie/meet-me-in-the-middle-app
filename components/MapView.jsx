@@ -14,6 +14,7 @@ export default function MapView({ session, currentUserId, sessionId }) {
     zoom: 10
   });
   const [updating, setUpdating] = useState(false);
+  const [routes, setRoutes] = useState({ route1: null, route2: null });
 
   // Calculate bounds to fit all markers
   useEffect(() => {
@@ -123,6 +124,43 @@ export default function MapView({ session, currentUserId, sessionId }) {
   const users = session?.users ? Object.entries(session.users) : [];
   const currentUser = session?.users?.[currentUserId];
 
+  // Fetch driving routes when venue is selected
+  useEffect(() => {
+    const fetchRoutes = async () => {
+      if (!session?.selectedVenue || !session?.users) return;
+      
+      const users = Object.values(session.users);
+      if (users.length !== 2) return;
+
+      const venue = session.selectedVenue;
+      
+      try {
+        // Fetch route for User 1
+        const response1 = await fetch(
+          `https://api.mapbox.com/directions/v5/mapbox/driving/${users[0].location.lng},${users[0].location.lat};${venue.location.lng},${venue.location.lat}?geometries=geojson&access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}`
+        );
+        const data1 = await response1.json();
+        
+        // Fetch route for User 2
+        const response2 = await fetch(
+          `https://api.mapbox.com/directions/v5/mapbox/driving/${users[1].location.lng},${users[1].location.lat};${venue.location.lng},${venue.location.lat}?geometries=geojson&access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}`
+        );
+        const data2 = await response2.json();
+        
+        setRoutes({
+          route1: data1.routes?.[0]?.geometry || null,
+          route2: data2.routes?.[0]?.geometry || null
+        });
+      } catch (error) {
+        console.error('Error fetching routes:', error);
+        setRoutes({ route1: null, route2: null });
+      }
+    };
+
+    fetchRoutes();
+  }, [session?.selectedVenue?.id, session?.users]);
+
+
   return (
     <div className="relative w-full h-[400px] sm:h-[500px] lg:h-[600px]">
       
@@ -205,21 +243,57 @@ export default function MapView({ session, currentUserId, sessionId }) {
           </Marker>
         )}
 
+        {/* Route Lines - User 1 to Selected Venue */}
+        {routes.route1 && (
+          <Source type="geojson" data={routes.route1}>
+            <Layer
+              type="line"
+              paint={{
+                'line-color': '#3b82f6',
+                'line-width': 4,
+                'line-opacity': 0.7
+              }}
+            />
+          </Source>
+        )}
+
+        {/* Route Lines - User 2 to Selected Venue */}
+        {routes.route2 && (
+          <Source type="geojson" data={routes.route2}>
+            <Layer
+              type="line"
+              paint={{
+                'line-color': '#22c55e',
+                'line-width': 4,
+                'line-opacity': 0.7
+              }}
+            />
+          </Source>
+        )}
+
         {/* Venue Markers */}
-        {session?.venues?.map((venue, index) => (
-          <Marker
-            key={venue.id}
-            latitude={venue.location.lat}
-            longitude={venue.location.lng}
-          >
-            <div 
-              className="w-8 h-8 bg-red-500 border-2 border-red-700 rounded-full flex items-center justify-center text-white font-bold shadow-lg cursor-pointer hover:scale-110 transition-transform"
-              title={venue.name}
+        {session?.venues?.map((venue, index) => {
+          const isSelected = session?.selectedVenue?.id === venue.id;
+          
+          return (
+            <Marker
+              key={venue.id}
+              latitude={venue.location.lat}
+              longitude={venue.location.lng}
             >
-              {index + 1}
-            </div>
-          </Marker>
-        ))}
+              <div 
+                className={`rounded-full flex items-center justify-center text-white font-bold shadow-lg cursor-pointer hover:scale-110 transition-transform ${
+                  isSelected 
+                    ? 'w-12 h-12 bg-yellow-500 border-4 border-yellow-700 animate-pulse' 
+                    : 'w-8 h-8 bg-red-500 border-2 border-red-700'
+                }`}
+                title={venue.name}
+              >
+                {isSelected ? '★' : index + 1}
+              </div>
+            </Marker>
+          );
+        })}
 
         {/* Lines connecting users to midpoint */}
         {session?.midpoint && users.length === 2 && (
@@ -270,10 +344,23 @@ export default function MapView({ session, currentUserId, sessionId }) {
           <div className="w-4 h-4 bg-purple-500 rounded-full border-2 border-purple-700"></div>
           <span className="text-[#37474f] font-medium">Midpoint</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 mb-1">
           <div className="w-4 h-4 bg-red-500 rounded-full border-2 border-red-700"></div>
           <span className="text-[#37474f] font-medium">Venues</span>
         </div>
+        {session?.selectedVenue && (
+          <>
+            <div className="border-t border-[#d0d0d0] my-2"></div>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-6 h-1 bg-blue-500 opacity-70"></div>
+              <span className="text-[#37474f] font-medium">Your route</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-1 bg-green-500 opacity-70"></div>
+              <span className="text-[#37474f] font-medium">Their route</span>
+            </div>
+          </>
+        )}
       </div>
 
     </div>

@@ -17,6 +17,7 @@ export default function SessionPage() {
   const [loading, setLoading] = useState(true);
   const [showNameModal, setShowNameModal] = useState(false);
   const [pendingLocation, setPendingLocation] = useState(null);
+  const [showShareMenu, setShowShareMenu] = useState(false);
 
   useEffect(() => {
     // Generate unique user ID (stored in localStorage)
@@ -57,6 +58,15 @@ export default function SessionPage() {
 
     return () => unsubscribe();
   }, [sessionId]);
+
+  // Close share menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setShowShareMenu(false);
+    if (showShareMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showShareMenu]);
 
   const joinSession = async (location) => {
     // Store location and show name modal
@@ -139,16 +149,61 @@ export default function SessionPage() {
               </div>
             </div>
             
-            {/* Share Link Button */}
-            <button 
-              onClick={copyShareLink}
-              className="bg-gradient-to-r from-[#8bc34a] to-[#9ccc65] hover:from-[#7cb342] hover:to-[#8bc34a] text-white px-5 py-2.5 rounded transition-all duration-200 font-medium text-sm shadow-md hover:shadow-lg inline-flex items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-              </svg>
-              <span>Share Link</span>
-            </button>
+            {/* Share Link Buttons */}
+            <div className="relative">
+              <button 
+                onClick={() => setShowShareMenu(!showShareMenu)}
+                className="bg-gradient-to-r from-[#8bc34a] to-[#9ccc65] hover:from-[#7cb342] hover:to-[#8bc34a] text-white px-5 py-2.5 rounded transition-all duration-200 font-medium text-sm shadow-md hover:shadow-lg inline-flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+                <span>Share</span>
+                <svg className={`w-4 h-4 transition-transform ${showShareMenu ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {/* Dropdown Menu */}
+              {showShareMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-white border border-[#d0d0d0] rounded shadow-lg z-50">
+                  <button
+                    onClick={() => {
+                      copyShareLink();
+                      setShowShareMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center gap-2 text-[#37474f]"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    Copy Link
+                  </button>
+                  
+                  
+                  <a href={`sms:?&body=Let's meet! Join me here: ${typeof window !== 'undefined' ? window.location.href : ''}`}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center gap-2 text-[#37474f] border-t border-[#d0d0d0]"
+                    onClick={() => setShowShareMenu(false)}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                    </svg>
+                    Share via SMS
+                  </a>
+                  
+                  
+                  <a href={`mailto:?subject=Let's meet halfway!&body=Join me to find the perfect meeting spot: ${typeof window !== 'undefined' ? window.location.href : ''}`}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center gap-2 text-[#37474f] border-t border-[#d0d0d0] rounded-b"
+                    onClick={() => setShowShareMenu(false)}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    Share via Email
+                  </a>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
