@@ -19,9 +19,10 @@ export default function SessionPage() {
   const [showNameModal, setShowNameModal] = useState(false);
   const [pendingLocation, setPendingLocation] = useState(null);
   const [showShareMenu, setShowShareMenu] = useState(false);
+  const [isFirstUser, setIsFirstUser] = useState(false);
+  const [filteredVenues, setFilteredVenues] = useState([]);
 
   useEffect(() => {
-    // Generate unique user ID per session (stored in localStorage)
     const storageKey = `userId_${sessionId}`;
     let uid = localStorage.getItem(storageKey);
     if (!uid) {
@@ -30,19 +31,16 @@ export default function SessionPage() {
     }
     setUserId(uid);
 
-    // Listen to session updates in real-time
     const sessionRef = ref(database, `sessions/${sessionId}`);
     
     const unsubscribe = onValue(sessionRef, (snapshot) => {
       const data = snapshot.val();
       
       if (!data) {
-        // Session doesn't exist or expired
         setLoading(false);
         return;
       }
       
-      // Check if session expired
       if (data.expiresAt < Date.now()) {
         alert('This session has expired');
         setLoading(false);
@@ -52,7 +50,6 @@ export default function SessionPage() {
       setSession(data);
       setLoading(false);
       
-      // Check if this user has already joined
       if (data.users && data.users[uid]) {
         setHasJoined(true);
       }
@@ -61,7 +58,6 @@ export default function SessionPage() {
     return () => unsubscribe();
   }, [sessionId]);
 
-  // Close share menu when clicking outside
   useEffect(() => {
     const handleClickOutside = () => setShowShareMenu(false);
     if (showShareMenu) {
@@ -71,12 +67,14 @@ export default function SessionPage() {
   }, [showShareMenu]);
 
   const joinSession = async (location) => {
-    // Store location and show name modal
     setPendingLocation(location);
+    // First user = no categories saved yet on session
+    const firstUser = !session?.categories || session.categories.length === 0;
+    setIsFirstUser(firstUser);
     setShowNameModal(true);
   };
 
-  const handleNameSubmit = async (userName) => {
+  const handleNameSubmit = async (userName, selectedCategories) => {
     const updates = {};
     
     updates[`sessions/${sessionId}/users/${userId}`] = {
@@ -84,6 +82,11 @@ export default function SessionPage() {
       location: pendingLocation,
       lastUpdated: Date.now()
     };
+
+    // Only first user sets the categories for the session
+    if (isFirstUser && selectedCategories) {
+      updates[`sessions/${sessionId}/categories`] = selectedCategories;
+    }
     
     await update(ref(database), updates);
     setHasJoined(true);
@@ -166,7 +169,6 @@ export default function SessionPage() {
                 </svg>
               </button>
 
-              {/* Dropdown Menu */}
               {showShareMenu && (
                 <div className="absolute right-0 mt-2 w-48 bg-white border border-[#d0d0d0] rounded shadow-lg z-50">
                   <button
@@ -182,7 +184,6 @@ export default function SessionPage() {
                     Copy Link
                   </button>
                   
-                  
                   <a href={`sms:?&body=Let's meet! Join me here: ${typeof window !== 'undefined' ? window.location.href : ''}`}
                     className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center gap-2 text-[#37474f] border-t border-[#d0d0d0]"
                     onClick={() => setShowShareMenu(false)}
@@ -192,7 +193,6 @@ export default function SessionPage() {
                     </svg>
                     Share via SMS
                   </a>
-                  
                   
                   <a href={`mailto:?subject=Let's meet halfway!&body=Join me to find the perfect meeting spot: ${typeof window !== 'undefined' ? window.location.href : ''}`}
                     className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center gap-2 text-[#37474f] border-t border-[#d0d0d0] rounded-b"
@@ -209,25 +209,24 @@ export default function SessionPage() {
           </div>
         </div>
 
-        {/* Location Input - shows if user hasn't joined yet */}
+        {/* Location Input */}
         {!hasJoined && (
           <LocationInput onLocationSet={joinSession} />
         )}
 
-        {/* Main App - shows when user has joined */}
+        {/* Main App */}
         {hasJoined && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 max-w-7xl mx-auto">
             
-            {/* Map + Chat (desktop) */}
             <div className="order-1">
               <div className="bg-white border border-[#d0d0d0] rounded shadow-sm p-3 sm:p-6">
                 <MapView
                   session={session}
                   currentUserId={userId}
                   sessionId={sessionId}
+                  filteredVenues={filteredVenues}
                 />
               </div>
-              {/* Desktop chat - below map */}
               <ChatPanel
                 session={session}
                 sessionId={sessionId}
@@ -235,10 +234,13 @@ export default function SessionPage() {
               />
             </div>
 
-            {/* Venues */}
             <div className="bg-white border border-[#d0d0d0] rounded shadow-sm p-2 sm:p-4 order-2">
               {canStart ? (
-                <VenueList session={session} sessionId={sessionId} />
+                <VenueList 
+                  session={session} 
+                  sessionId={sessionId} 
+                  onFilteredVenuesChange={setFilteredVenues}
+                />
               ) : (
                 <div className="text-center text-gray-500 py-8 sm:py-12">
                   <div className="text-4xl mb-4">⏳</div>
@@ -253,11 +255,11 @@ export default function SessionPage() {
 
       </div>
 
-      {/* Name Modal */}
       <NameModal 
         isOpen={showNameModal}
         onSubmit={handleNameSubmit}
         onCancel={handleNameCancel}
+        isFirstUser={isFirstUser}
       />
     </div>
   );

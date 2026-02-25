@@ -1,15 +1,24 @@
 'use client';
 import { useState } from 'react';
 
+const ERROR_MESSAGES = {
+  1: "Location access was denied. Please allow location access in your browser settings, or enter your address manually below.",
+  2: "Your location couldn't be determined. Please try again or enter your address manually.",
+  3: "Location request timed out. Please try again or enter your address manually.",
+  default: "Unable to get your location. Please enter your address manually."
+};
+
 export default function LocationInput({ onLocationSet }) {
   const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const useCurrentLocation = () => {
     setLoading(true);
-    
+    setError('');
+
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser');
+      setError('Your browser does not support location sharing. Please enter your address manually.');
       setLoading(false);
       return;
     }
@@ -22,30 +31,28 @@ export default function LocationInput({ onLocationSet }) {
           const response = await fetch(
             `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}`
           );
+
+          if (!response.ok) throw new Error('Geocoding failed');
+
           const data = await response.json();
           const addressText = data.features[0]?.place_name || 'Current Location';
           
-          onLocationSet({
-            lat: latitude,
-            lng: longitude,
-            address: addressText
-          });
+          onLocationSet({ lat: latitude, lng: longitude, address: addressText });
         } catch (error) {
           console.error('Geocoding error:', error);
-          onLocationSet({
-            lat: latitude,
-            lng: longitude,
-            address: 'Current Location'
-          });
+          // Still proceed with coordinates even if address lookup fails
+          onLocationSet({ lat: latitude, lng: longitude, address: 'Current Location' });
         }
         
         setLoading(false);
       },
       (error) => {
-        alert('Unable to get your location. Please enter your address manually.');
-        console.error(error);
+        const message = ERROR_MESSAGES[error.code] || ERROR_MESSAGES.default;
+        setError(message);
+        console.error('Geolocation error:', error);
         setLoading(false);
-      }
+      },
+      { timeout: 10000, maximumAge: 60000 }
     );
   };
 
@@ -54,27 +61,26 @@ export default function LocationInput({ onLocationSet }) {
     if (!address.trim()) return;
     
     setLoading(true);
+    setError('');
     
     try {
       const response = await fetch(
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}`
       );
+
+      if (!response.ok) throw new Error('Geocoding request failed');
+
       const data = await response.json();
       
       if (data.features && data.features.length > 0) {
         const [lng, lat] = data.features[0].center;
-        
-        onLocationSet({
-          lat,
-          lng,
-          address: data.features[0].place_name
-        });
+        onLocationSet({ lat, lng, address: data.features[0].place_name });
       } else {
-        alert('Address not found. Please try again.');
+        setError('Address not found. Please try a different address or be more specific.');
       }
     } catch (error) {
       console.error('Geocoding error:', error);
-      alert('Failed to find address. Please try again.');
+      setError('Failed to find that address. Please check your connection and try again.');
     }
     
     setLoading(false);
@@ -84,6 +90,18 @@ export default function LocationInput({ onLocationSet }) {
     <div className="bg-white border border-[#d0d0d0] rounded shadow-sm p-6 max-w-md mx-auto">
       <h2 className="text-xl font-bold text-[#37474f] mb-4">Set Your Location</h2>
       
+      {/* Error Message */}
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+          <div className="flex items-start gap-2">
+            <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{error}</span>
+          </div>
+        </div>
+      )}
+
       {/* Current Location Button */}
       <button
         onClick={useCurrentLocation}
@@ -104,8 +122,9 @@ export default function LocationInput({ onLocationSet }) {
         <input
           type="text"
           value={address}
-          onChange={(e) => setAddress(e.target.value)}
+          onChange={(e) => { setAddress(e.target.value); setError(''); }}
           placeholder="Enter your address"
+          autoComplete="off"
           className="w-full bg-white border border-[#d0d0d0] text-[#37474f] rounded px-4 py-3 mb-4 focus:outline-none focus:ring-2 focus:ring-[#8bc34a] focus:border-transparent placeholder-gray-400"
           disabled={loading}
         />

@@ -6,7 +6,7 @@ import { database } from '@/lib/firebase';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { timeAgo } from '@/lib/timeAgo';
 
-export default function MapView({ session, currentUserId, sessionId }) {
+export default function MapView({ session, currentUserId, sessionId, filteredVenues }) {
   const mapRef = useRef();
   const [viewport, setViewport] = useState({
     latitude: 28.5383,
@@ -15,6 +15,8 @@ export default function MapView({ session, currentUserId, sessionId }) {
   });
   const [updating, setUpdating] = useState(false);
   const [routes, setRoutes] = useState([]);
+
+  const venuesToShow = filteredVenues?.length > 0 ? filteredVenues : (session?.venues || []);
 
   // Calculate bounds to fit all markers
   useEffect(() => {
@@ -35,11 +37,9 @@ export default function MapView({ session, currentUserId, sessionId }) {
       points.push([session.midpoint.lng, session.midpoint.lat]);
     }
 
-    if (session.venues) {
-      session.venues.forEach(venue => {
-        points.push([venue.location.lng, venue.location.lat]);
-      });
-    }
+    venuesToShow.forEach(venue => {
+      points.push([venue.location.lng, venue.location.lat]);
+    });
 
     if (points.length > 0) {
       const lngs = points.map(p => p[0]);
@@ -55,7 +55,7 @@ export default function MapView({ session, currentUserId, sessionId }) {
         duration: 1000
       });
     }
-  }, [session?.users, session?.midpoint, session?.venues]);
+  }, [session?.users, session?.midpoint, filteredVenues]);
 
   // Update current user's location
   const updateMyLocation = async () => {
@@ -81,8 +81,6 @@ export default function MapView({ session, currentUserId, sessionId }) {
           updates[`sessions/${sessionId}/users/${currentUserId}/lastUpdated`] = Date.now();
 
           await update(ref(database), updates);
-          
-          // Trigger recalculation
           await recalculateMidpointAndVenues();
         } catch (error) {
           console.error('Error updating location:', error);
@@ -99,14 +97,11 @@ export default function MapView({ session, currentUserId, sessionId }) {
     );
   };
 
-  // Recalculate midpoint and venues
   const recalculateMidpointAndVenues = async () => {
     const userList = Object.values(session.users);
     if (userList.length < 2) return;
 
-    // Filter users with valid locations
     const usersWithLocations = userList.filter(u => u.location?.lat && u.location?.lng);
-
     if (usersWithLocations.length < 2) return;
 
     try {
@@ -115,7 +110,8 @@ export default function MapView({ session, currentUserId, sessionId }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId,
-          users: usersWithLocations
+          users: usersWithLocations,
+          categories: session?.categories || ['dining', 'bars'],
         })
       });
     } catch (error) {
@@ -138,7 +134,6 @@ export default function MapView({ session, currentUserId, sessionId }) {
 
     const fetchRoutes = async () => {
       try {
-        // Fetch routes for all users with valid locations
         const routePromises = userList
           .filter(user => user?.location?.lat && user?.location?.lng)
           .map(async (user, index) => {
@@ -162,7 +157,6 @@ export default function MapView({ session, currentUserId, sessionId }) {
 
     fetchRoutes();
   }, [session?.selectedVenue?.id, session?.users]);
-
 
   return (
     <div className="relative w-full h-[400px] sm:h-[500px] lg:h-[600px]">
@@ -193,7 +187,6 @@ export default function MapView({ session, currentUserId, sessionId }) {
         
         {/* User Markers */}
         {users.map(([userId, user], index) => {
-          // Skip if user doesn't have location
           if (!user?.location?.lat || !user?.location?.lng) return null;
 
           const isCurrentUser = userId === currentUserId;
@@ -236,7 +229,7 @@ export default function MapView({ session, currentUserId, sessionId }) {
           </Marker>
         )}
 
-        {/* Route Lines - All Users to Selected Venue */}
+        {/* Route Lines */}
         {routes.map((route) => {
           const routeColors = ['#3b82f6', '#22c55e', '#a855f7', '#f97316'];
           const color = routeColors[route.index] || routeColors[0];
@@ -255,8 +248,8 @@ export default function MapView({ session, currentUserId, sessionId }) {
           );
         })}
 
-        {/* Venue Markers */}
-        {session?.venues?.map((venue, index) => {
+        {/* Venue Markers — only filtered venues */}
+        {venuesToShow.map((venue, index) => {
           const isSelected = session?.selectedVenue?.id === venue.id;
           
           return (
