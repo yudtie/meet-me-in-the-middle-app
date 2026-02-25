@@ -11,7 +11,7 @@ const CATEGORY_OPTIONS = [
   { id: 'parks', label: '🌳 Parks & Outdoors', mapboxCategories: ['park', 'playground', 'nature'] },
   { id: 'bookstores', label: '📚 Book Stores', mapboxCategories: ['book_store', 'bookstore'] },
   { id: 'shopping', label: '🛍️ Shopping', mapboxCategories: ['shopping_mall', 'retail', 'department_store'] },
-  { id: 'golf', label: '⛳ Golf Courses' },
+  { id: 'golf', label: '⛳ Golf Courses', mapboxCategories: ['golf_course', 'country_club'] },
 ];
 
 export default function NameModal({ isOpen, onSubmit, onCancel, isFirstUser }) {
@@ -55,7 +55,7 @@ export default function NameModal({ isOpen, onSubmit, onCancel, isFirstUser }) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Enter your name"
-            autoComplete="off"
+            autoComplete="new-password"
             className="w-full bg-white border border-[#d0d0d0] text-[#37474f] rounded px-4 py-3 mb-6 focus:outline-none focus:ring-2 focus:ring-[#8bc34a] focus:border-transparent placeholder-gray-400"
             autoFocus
             maxLength={30}

@@ -124,7 +124,7 @@ export default function LocationInput({ onLocationSet }) {
           value={address}
           onChange={(e) => { setAddress(e.target.value); setError(''); }}
           placeholder="Enter your address"
-          autoComplete="off"
+          autoComplete="new-password"
           className="w-full bg-white border border-[#d0d0d0] text-[#37474f] rounded px-4 py-3 mb-4 focus:outline-none focus:ring-2 focus:ring-[#8bc34a] focus:border-transparent placeholder-gray-400"
           disabled={loading}
         />
