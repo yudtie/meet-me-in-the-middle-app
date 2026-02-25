@@ -28,7 +28,7 @@ const CATEGORY_KEYWORDS = {
   golf: ['golf', 'country_club'],
 };
 
-export default function VenueList({ session, sessionId, onFilteredVenuesChange }) {
+export default function VenueList({ session, sessionId, onFilteredVenuesChange, isCreator, onEditCategories }) {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -121,7 +121,7 @@ export default function VenueList({ session, sessionId, onFilteredVenuesChange }
         calculateVenues();
       }
     }
-  }, [users.length]);
+  }, [users.length, session?.categories]);
 
   useEffect(() => {
     if (session?.selectedCategory) {
@@ -186,9 +186,19 @@ export default function VenueList({ session, sessionId, onFilteredVenuesChange }
 
       {/* Header */}
       <div className="mb-4">
-        <h2 className="text-xl font-bold text-[#37474f] mb-2">
-          Suggested Meeting Spots ({filteredVenues.length})
-        </h2>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xl font-bold text-[#37474f]">
+            Suggested Meeting Spots ({filteredVenues.length})
+          </h2>
+          {isCreator && (
+            <button
+              onClick={onEditCategories}
+              className="text-sm text-[#8bc34a] border border-[#8bc34a] px-3 py-1 rounded hover:bg-green-50 transition-colors font-medium"
+            >
+              ✏️ Edit Categories
+            </button>
+          )}
+        </div>
         <p className="text-sm text-[#6b7c87]">
           Sorted by fairest drive time for all users
         </p>

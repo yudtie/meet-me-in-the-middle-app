@@ -8,13 +8,21 @@ export default function HomePage() {
 
   const createSession = async () => {
     try {
+      // Generate creator ID and store in localStorage
+      const creatorId = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
       const sessionsRef = ref(database, 'sessions');
       const newSessionRef = push(sessionsRef);
       const sessionId = newSessionRef.key;
-      
+
+      // Store creatorId in localStorage keyed to this session
+      localStorage.setItem(`userId_${sessionId}`, creatorId);
+      localStorage.setItem(`creator_${sessionId}`, creatorId);
+
       await set(newSessionRef, {
         createdAt: Date.now(),
         expiresAt: Date.now() + (6 * 60 * 60 * 1000),
+        createdBy: creatorId,
         users: {},
         midpoint: null,
         venues: []

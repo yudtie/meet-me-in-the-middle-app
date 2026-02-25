@@ -9,6 +9,8 @@ import VenueList from '@/components/VenueList';
 import NameModal from '@/components/NameModal';
 import ChatPanel from '@/components/ChatPanel';
 
+import EditCategoriesModal from '@/components/EditCategoriesModal';
+
 export default function SessionPage() {
   const params = useParams();
   const sessionId = params.id;
@@ -21,6 +23,8 @@ export default function SessionPage() {
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [isFirstUser, setIsFirstUser] = useState(false);
   const [filteredVenues, setFilteredVenues] = useState([]);
+  const [isCreator, setIsCreator] = useState(false);
+  const [showEditCategories, setShowEditCategories] = useState(false);
 
   useEffect(() => {
     const storageKey = `userId_${sessionId}`;
@@ -30,6 +34,12 @@ export default function SessionPage() {
       localStorage.setItem(storageKey, uid);
     }
     setUserId(uid);
+
+    // Check if this user is the session creator
+    const creatorId = localStorage.getItem(`creator_${sessionId}`);
+    if (creatorId && creatorId === uid) {
+      setIsCreator(true);
+    }
 
     const sessionRef = ref(database, `sessions/${sessionId}`);
     
@@ -92,6 +102,15 @@ export default function SessionPage() {
     setHasJoined(true);
     setShowNameModal(false);
     setPendingLocation(null);
+  };
+
+  const handleEditCategories = async (newCategories) => {
+    const updates = {};
+    updates[`sessions/${sessionId}/categories`] = newCategories;
+    updates[`sessions/${sessionId}/venues`] = [];
+    updates[`sessions/${sessionId}/selectedVenue`] = null;
+    await update(ref(database), updates);
+    setShowEditCategories(false);
   };
 
   const handleNameCancel = () => {
@@ -240,6 +259,8 @@ export default function SessionPage() {
                   session={session} 
                   sessionId={sessionId} 
                   onFilteredVenuesChange={setFilteredVenues}
+                  isCreator={isCreator}
+                  onEditCategories={() => setShowEditCategories(true)}
                 />
               ) : (
                 <div className="text-center text-gray-500 py-8 sm:py-12">
@@ -260,6 +281,13 @@ export default function SessionPage() {
         onSubmit={handleNameSubmit}
         onCancel={handleNameCancel}
         isFirstUser={isFirstUser}
+      />
+
+      <EditCategoriesModal
+        isOpen={showEditCategories}
+        currentCategories={session?.categories || ['dining']}
+        onSave={handleEditCategories}
+        onCancel={() => setShowEditCategories(false)}
       />
     </div>
   );
