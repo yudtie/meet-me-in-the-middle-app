@@ -26,7 +26,7 @@ export async function POST(request) {
       );
     }
 
-    const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+    const MAPBOX_TOKEN = process.env.MAPBOX_SECRET_TOKEN;
 
     // Calculate geographic center of all users
     const avgLat = users.reduce((sum, u) => sum + u.location.lat, 0) / users.length;
