@@ -224,22 +224,19 @@ export default function SessionPage() {
                     Share via SMS
                   </a>
                   
-                  {/* Share via Email — with iOS mailto fallback */}
+                  {/* Share via Email — iOS doesn't reliably handle mailto: so copy instead */}
                   <button
                     onClick={() => {
                       setShowShareMenu(false);
                       const url = window.location.href;
-                      const mailtoLink = `mailto:?subject=Let's meet halfway!&body=Join me to find the perfect meeting spot: ${url}`;
-                      const win = window.open(mailtoLink, '_blank');
-                      // Fallback: iOS without a mail app won't open anything
-                      // Check after 500ms and copy to clipboard instead
-                      setTimeout(() => {
-                        if (!win || win.closed) {
-                          navigator.clipboard.writeText(url).then(() => {
-                            alert('No email app found — link copied to clipboard instead!');
-                          });
-                        }
-                      }, 500);
+                      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                      if (isIOS) {
+                        navigator.clipboard.writeText(url).then(() => {
+                          alert('Link copied! Paste it into your email app.');
+                        });
+                      } else {
+                        window.location.href = `mailto:?subject=Let's meet halfway!&body=Join me to find the perfect meeting spot: ${url}`;
+                      }
                     }}
                     className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center gap-2 text-[#37474f] border-t border-[#d0d0d0] rounded-b"
                   >
