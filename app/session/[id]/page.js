@@ -8,7 +8,6 @@ import MapView from '@/components/MapView';
 import VenueList from '@/components/VenueList';
 import NameModal from '@/components/NameModal';
 import ChatPanel from '@/components/ChatPanel';
-
 import EditCategoriesModal from '@/components/EditCategoriesModal';
 
 export default function SessionPage() {
@@ -25,6 +24,7 @@ export default function SessionPage() {
   const [filteredVenues, setFilteredVenues] = useState([]);
   const [isCreator, setIsCreator] = useState(false);
   const [showEditCategories, setShowEditCategories] = useState(false);
+  const [copyConfirmed, setCopyConfirmed] = useState(false); // NEW: inline copy confirmation
 
   useEffect(() => {
     const storageKey = `userId_${sessionId}`;
@@ -35,7 +35,6 @@ export default function SessionPage() {
     }
     setUserId(uid);
 
-    // Check if this user is the session creator
     const creatorId = localStorage.getItem(`creator_${sessionId}`);
     if (creatorId && creatorId === uid) {
       setIsCreator(true);
@@ -78,7 +77,6 @@ export default function SessionPage() {
 
   const joinSession = async (location) => {
     setPendingLocation(location);
-    // First user = no categories saved yet on session
     const firstUser = !session?.categories || session.categories.length === 0;
     setIsFirstUser(firstUser);
     setShowNameModal(true);
@@ -93,7 +91,6 @@ export default function SessionPage() {
       lastUpdated: Date.now()
     };
 
-    // Only first user sets the categories for the session
     if (isFirstUser && selectedCategories) {
       updates[`sessions/${sessionId}/categories`] = selectedCategories;
     }
@@ -118,9 +115,12 @@ export default function SessionPage() {
     setPendingLocation(null);
   };
 
+  // UPDATED: no more alert(), shows inline confirmation instead
   const copyShareLink = () => {
-    navigator.clipboard.writeText(window.location.href);
-    alert('Link copied! Share it with your friend.');
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      setCopyConfirmed(true);
+      setTimeout(() => setCopyConfirmed(false), 2000);
+    });
   };
 
   if (loading) {
@@ -173,7 +173,7 @@ export default function SessionPage() {
               </div>
             </div>
             
-            {/* Share Link Buttons */}
+            {/* Share Button + Dropdown */}
             <div className="relative">
               <button 
                 onClick={() => setShowShareMenu(!showShareMenu)}
@@ -188,8 +188,17 @@ export default function SessionPage() {
                 </svg>
               </button>
 
+              {/* Inline copy confirmation toast */}
+              {copyConfirmed && (
+                <div className="absolute right-0 -bottom-10 bg-[#37474f] text-white text-xs px-3 py-1.5 rounded shadow-md whitespace-nowrap z-50">
+                  ✓ Link copied to clipboard
+                </div>
+              )}
+
               {showShareMenu && (
                 <div className="absolute right-0 mt-2 w-48 bg-white border border-[#d0d0d0] rounded shadow-lg z-50">
+                  
+                  {/* Copy Link */}
                   <button
                     onClick={() => {
                       copyShareLink();
@@ -203,7 +212,9 @@ export default function SessionPage() {
                     Copy Link
                   </button>
                   
-                  <a href={`sms:?&body=Let's meet! Join me here: ${typeof window !== 'undefined' ? window.location.href : ''}`}
+                  {/* Share via SMS */}
+                  <a
+                    href={`sms:?&body=Let's meet! Join me here: ${typeof window !== 'undefined' ? window.location.href : ''}`}
                     className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center gap-2 text-[#37474f] border-t border-[#d0d0d0]"
                     onClick={() => setShowShareMenu(false)}
                   >
@@ -213,15 +224,31 @@ export default function SessionPage() {
                     Share via SMS
                   </a>
                   
-                  <a href={`mailto:?subject=Let's meet halfway!&body=Join me to find the perfect meeting spot: ${typeof window !== 'undefined' ? window.location.href : ''}`}
+                  {/* Share via Email — with iOS mailto fallback */}
+                  <button
+                    onClick={() => {
+                      setShowShareMenu(false);
+                      const url = window.location.href;
+                      const mailtoLink = `mailto:?subject=Let's meet halfway!&body=Join me to find the perfect meeting spot: ${url}`;
+                      const win = window.open(mailtoLink, '_blank');
+                      // Fallback: iOS without a mail app won't open anything
+                      // Check after 500ms and copy to clipboard instead
+                      setTimeout(() => {
+                        if (!win || win.closed) {
+                          navigator.clipboard.writeText(url).then(() => {
+                            alert('No email app found — link copied to clipboard instead!');
+                          });
+                        }
+                      }, 500);
+                    }}
                     className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center gap-2 text-[#37474f] border-t border-[#d0d0d0] rounded-b"
-                    onClick={() => setShowShareMenu(false)}
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     </svg>
                     Share via Email
-                  </a>
+                  </button>
+
                 </div>
               )}
             </div>
