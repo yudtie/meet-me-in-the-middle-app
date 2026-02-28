@@ -43,7 +43,7 @@ export default function HomePage() {
         {/* Logo */}
         <div className="mb-8 inline-block">
           <img 
-            src="/map-pin-icon.webp" 
+            src="/icon-512.webp" 
             alt="Meet Me in the Middle Logo" 
             className="w-30 h-30 object-contain"
           />
