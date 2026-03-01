@@ -3,6 +3,12 @@ import "./globals.css";
 import Footer from "@/components/Footer";
 import PrivacyNotice from "@/components/PrivacyNotice";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
+import { Kodchasan } from 'next/font/google';
+
+const kodchasan = Kodchasan({ 
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700']
+})
 
 export const metadata = {
   title: "Meet Me in the Middle - Find Perfect Meeting Spots",
@@ -23,7 +29,7 @@ export default function RootLayout({ children }) {
         <meta name="apple-mobile-web-app-title" content="MeetMiddle" />
         <link rel="apple-touch-icon" href="/icon-192.webp" />
       </head>
-      <body className="antialiased">
+      <body className={kodchasan.className}>
         <GoogleAnalytics />
         {children}
         <PrivacyNotice />
