@@ -27,7 +27,6 @@ export async function POST(request) {
     }
 
     const MAPBOX_TOKEN = process.env.MAPBOX_SECRET_TOKEN;
-    const sessionToken = crypto.randomUUID();
 
     // Calculate geographic center of all users
     const avgLat = users.reduce((sum, u) => sum + u.location.lat, 0) / users.length;
