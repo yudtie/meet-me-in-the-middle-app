@@ -27,6 +27,7 @@ export async function POST(request) {
     }
 
     const MAPBOX_TOKEN = process.env.MAPBOX_SECRET_TOKEN;
+    const sessionToken = crypto.randomUUID();
 
     // Calculate geographic center of all users
     const avgLat = users.reduce((sum, u) => sum + u.location.lat, 0) / users.length;
@@ -42,10 +43,12 @@ export async function POST(request) {
 
     // Search for venues near the midpoint
     const searchResponse = await fetch(
-      `https://api.mapbox.com/search/searchbox/v1/category/${mapboxCategories}?proximity=${midpoint.lng},${midpoint.lat}&limit=20&access_token=${MAPBOX_TOKEN}`
+      `https://api.mapbox.com/search/searchbox/v1/category/${mapboxCategories}?proximity=${midpoint.lng},${midpoint.lat}&limit=20&session_token=${sessionToken}&access_token=${MAPBOX_TOKEN}`
     );
 
     if (!searchResponse.ok) {
+      const errBody = await searchResponse.text();
+      console.error('Mapbox search failed:', searchResponse.status, errBody);
       throw new Error('Failed to search venues');
     }
 
