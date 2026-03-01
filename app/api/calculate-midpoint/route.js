@@ -43,7 +43,7 @@ export async function POST(request) {
 
     // Search for venues near the midpoint
     const searchResponse = await fetch(
-      `https://api.mapbox.com/search/searchbox/v1/category/${mapboxCategories}?proximity=${midpoint.lng},${midpoint.lat}&limit=20&session_token=${sessionToken}&access_token=${MAPBOX_TOKEN}`
+      `https://api.mapbox.com/search/searchbox/v1/category/${mapboxCategories}?proximity=${midpoint.lng},${midpoint.lat}&limit=20&access_token=${MAPBOX_TOKEN}`
     );
 
     if (!searchResponse.ok) {
